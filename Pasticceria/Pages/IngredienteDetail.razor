@@ -1,0 +1,111 @@
+﻿@page "/ingredientedetail/{Ingrediente}/{Dolce}"
+
+@inject Radzen.DialogService myDialogService
+@inject Data.Service.CustomHttpClient myCustomHttpClient
+@inject Data.Service.AppSettings myAppSettings
+@inject NotificationService myNotificationService
+
+@if (unitaMisura == null) { }
+else
+{
+    <div class="row form-group">
+        <div class="col-12">
+            <div><b>ID</b></div>
+            <label>@myIngrediente.ID</label>
+        </div>
+    </div>
+    <div class="row form-group">
+        <div class="col-12">
+            <div><b>Nome</b></div>
+            <RadzenTextBox @bind-Value="myIngrediente.Nome" Style="width:100%" />
+        </div>
+    </div>
+    <div class="row form-group">
+        <div class="col-6">
+            <div><b>Quantità</b></div>
+            <RadzenNumeric TValue="int" Format="0" @bind-Value="myIngrediente.Qta" Style="width:100%" />
+        </div>
+        <div class="col-6">
+            <div><b>Unità di misura</b></div>
+            <RadzenDropDown AllowClear="false" TValue="string" @bind-Value="@myIngrediente.UnitaMisura" Data="@(unitaMisura.ToList())" TextProperty="Nome" ValueProperty="Simbolo" Style="margin-bottom: 20px" />
+        </div>
+    </div>
+    <div class="row form-group">
+        <div class="col-12 text-right">
+            <RadzenButton Click="@(() => onSave())" ButtonStyle="ButtonStyle.Secondary" Text="SALVA" Style="margin-bottom: 10px; width: 150px" />
+            <RadzenButton Click="@((args) => myDialogService.Close(false))" ButtonStyle="ButtonStyle.Secondary" Text="ANNULLA" Style="margin-bottom: 10px; width: 150px" />
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Data.Entity.Dolce Dolce { get; set; }
+    [Parameter] public Data.Entity.Ingrediente Ingrediente { get; set; }
+    string baseUrl;
+
+    Data.Entity.Ingrediente myIngrediente;
+    IEnumerable<Data.Entity.UnitaMisura> unitaMisura;
+
+    protected override async Task OnInitializedAsync()
+    {
+        baseUrl = myAppSettings.GetBaseUrl();
+        if (Ingrediente.ID == 0)
+        {
+            myIngrediente = new Data.Entity.Ingrediente();
+            myIngrediente.IDDolce = Dolce.ID;
+        }
+        else
+            myIngrediente = Ingrediente;
+
+        unitaMisura = await myCustomHttpClient.GetJsonAsync<Data.Entity.UnitaMisura[]>(baseUrl + "/api/unitamisura/get");
+    }
+
+    async Task onSave()
+    {
+
+        await Task.Run(() =>
+        {
+            if (!checkEmptyFields())
+            {
+                Messagge("Attenzione", "Valorizzare tutti i campi.", NotificationSeverity.Warning);
+                return;
+            }
+            else
+            {
+                if (myIngrediente.ID == 0 && HasInserted())
+                {
+                    Messagge("Attenzione", "Ingrediente già inserito.", NotificationSeverity.Warning);
+                    return;
+                }
+                else
+                {
+                    myDialogService.Close(myIngrediente);
+                }
+            }
+        });
+    }
+
+    private bool checkEmptyFields()
+    {
+        if (string.IsNullOrWhiteSpace(myIngrediente.Nome) || (myIngrediente.Qta == 0) || string.IsNullOrWhiteSpace(myIngrediente.UnitaMisura))
+        {
+            return false;
+        }
+        return true;
+    }
+
+    private void Messagge(string title, string detail, NotificationSeverity severity)
+    {
+        myNotificationService.Notify(new NotificationMessage { Severity = severity, Summary = title, Detail = detail, Duration = 4000 });
+    }
+
+    private bool HasInserted()
+    {
+        foreach (Data.Entity.Ingrediente ing in Dolce.Ingredienti) {
+            if (ing.Nome.ToLower() == myIngrediente.Nome) {
+                return true;
+            }
+        }
+        return false;
+    }
+}

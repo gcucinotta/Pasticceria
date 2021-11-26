@@ -1,0 +1,89 @@
+﻿@page "/backoffice"
+
+@inject Data.Service.CustomHttpClient myCustomHttpClient
+@inject Data.Service.AppSettings myAppSettings
+
+@inject NotificationService myNotificationService
+@inject NavigationManager myNavigationManager
+
+<Pasticceria.Pages.Components.TitlePage Title="Backoffice" />
+
+<div class="row">
+    <div class="col-3"></div>
+    <div class="col-6">
+        <div class="form-group">
+            <label>eMail</label>
+            <input type="email" class="form-control" aria-describedby="emailHelp" placeholder="Inserisci email" @bind-value="@_eMail">
+        </div>
+    </div>
+    <div class="col-3"></div>
+</div>
+<div class="row">
+    <div class="col-3"></div>
+    <div class="col-6">
+        <div class="form-group">
+            <label>Password</label>
+            <input type="password" class="form-control" id="exampleInputPassword1" placeholder="Password" @bind-value="@_password">
+        </div>
+    </div>
+    <div class="col-3"></div>
+</div>
+<div class="row">
+    <div class="col-3"></div>
+    <div class="col-6 text-right">
+        <div class="form-group">
+            <button type="button" class="btn btn-primary" style="width:120px;" @onclick="@(() => onAccedi())">ACCEDI</button>
+        </div>
+    </div>
+    <div class="col-3"></div>
+</div>
+
+@code {
+    string _eMail;
+    string _password;
+    string baseUrl;
+    Data.Entity.Utente myUtente = new Data.Entity.Utente();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.Run(() =>
+        {
+            myUtente.eMail = string.Empty;
+            myUtente.Password = string.Empty;
+        });
+    }
+
+    async Task onAccedi()
+    {
+        if (string.IsNullOrWhiteSpace(_eMail) || string.IsNullOrWhiteSpace(_password))
+        {
+            Messagge("Attenzione", "Inserire le credenziali.", NotificationSeverity.Info);
+            return;
+        }
+
+        baseUrl = myAppSettings.GetBaseUrl();
+        myUtente = await myCustomHttpClient.GetJsonAsync<Data.Entity.Utente>(baseUrl + "/api/utenti/isexists/" + _eMail);
+        if (myUtente == null)
+        {
+            Messagge("Attenzione", "Credenziali non valide.", NotificationSeverity.Error);
+            return;
+        }
+
+        if (myUtente.ID != 0)
+        {
+            // Controllo password ...
+            if (myUtente.Password == _password) {
+                myNavigationManager.NavigateTo("Dolci");
+            }
+            else
+            {
+                Messagge("Attenzione", "Credenziali non valide.", NotificationSeverity.Error);
+            }
+        }
+    }
+
+    private void Messagge(string title, string detail, NotificationSeverity severity)
+    {
+        myNotificationService.Notify(new NotificationMessage { Severity = severity, Summary = title, Detail = detail, Duration = 4000 });
+    }
+}

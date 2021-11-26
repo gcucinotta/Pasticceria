@@ -1,0 +1,73 @@
+﻿@page "/vetrina"
+
+@inject Data.Service.CustomHttpClient myCustomHttpClient
+@inject Data.Service.AppSettings myAppSettings
+
+<Pasticceria.Pages.Components.TitlePage Title="Vetrina" />
+
+@if (dolci == null)
+{
+    <div class="d-flex align-items-center">
+        <strong>Loading...</strong>
+        <div class="spinner-border ml-auto" role="status" aria-hidden="true"></div>
+    </div>
+}
+else
+{
+    <RadzenDataGrid @ref="myGridDolci" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true" RowRender="@RowRender" ExpandMode="DataGridExpandMode.Single"
+                    Data="@dolci" TItem="Data.Entity.Dolce">
+        <Template Context="dettaglio">
+            <RadzenTabs>
+                <Tabs>
+                    <RadzenTabsItem Text="Ingredienti">
+                        <RadzenDataGrid AllowFiltering="true" AllowPaging="true" AllowSorting="true" Data="@dettaglio.Ingredienti" TItem="Data.Entity.Ingrediente">
+                            <Columns>
+                                <RadzenDataGridColumn TItem="Data.Entity.Ingrediente" Property="Nome" Title="Nome" />
+                                <RadzenDataGridColumn TItem="Data.Entity.Ingrediente" Property="Qta" Title="Quantita" Width="100px" TextAlign="TextAlign.Center" />
+                                <RadzenDataGridColumn TItem="Data.Entity.Ingrediente" Property="UnitaMisura" Title="Unita misura" Width="150px" TextAlign="TextAlign.Center" />
+                            </Columns>
+                        </RadzenDataGrid>
+                    </RadzenTabsItem>
+                </Tabs>
+            </RadzenTabs>
+        </Template>
+        <Columns>
+            <RadzenDataGridColumn Width="200px" TItem="Data.Entity.Dolce" Property="Nome" Title="Nome" />
+            <RadzenDataGridColumn Width="50px" TItem="Data.Entity.Dolce" Property="Qta" Title="Quantita" />
+            <RadzenDataGridColumn Width="50px" TItem="Data.Entity.Dolce" Property="Prezzo" Title="Prezzo">
+                <Template Context="prezzo">
+                    @String.Format(new System.Globalization.CultureInfo("it-IT"), "{0:C}", prezzo.Prezzo)
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+    <div class="row form-group">
+        <div class="col-12 text-right">
+            Dolci presenti in archivio <b style="color:navy">@dolci.Count()</b>
+        </div>
+    </div>
+}
+
+@code {
+    string baseUrl;
+    IEnumerable<Data.Entity.Dolce> dolci;
+    RadzenDataGrid<Data.Entity.Dolce> myGridDolci;
+
+    protected override async Task OnInitializedAsync()
+    {
+        baseUrl = myAppSettings.GetBaseUrl();
+        dolci = await myCustomHttpClient.GetJsonAsync<Data.Entity.Dolce[]>(baseUrl + "/api/dolci/getbyvetrina");
+
+        foreach (Data.Entity.Dolce d in dolci)
+        {
+            d.Ingredienti = await myCustomHttpClient.GetJsonAsync<List<Data.Entity.Ingrediente>>(baseUrl + "/api/ingredienti/findbyiddolce/" + d.ID);
+        }
+    }
+
+    void RowRender(RowRenderEventArgs<Data.Entity.Dolce> args)
+    {
+        args.Expandable = true;
+    }
+
+
+}

@@ -1,0 +1,126 @@
+﻿@page "/dolci"
+
+@inject Data.Service.CustomHttpClient myCustomHttpClient
+@inject Data.Service.AppSettings myAppSettings
+@inject Radzen.DialogService myDialogService
+@inject NotificationService myNotificationService
+
+<Pasticceria.Pages.Components.TitlePage Title="Dolci" />
+
+@if (dolci != null)
+{
+    <RadzenDataGrid @ref="myGridDolci" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true" RowRender="@RowRender" ExpandMode="DataGridExpandMode.Single"
+                    Data="@dolci" TItem="Data.Entity.Dolce">
+        @*<Template Context="dolci">
+                <RadzenTabs>
+                    <Tabs>
+                        <RadzenTabsItem Text="Dolci dettaglio">
+                            <RadzenDataGrid AllowFiltering="true" AllowPaging="true" AllowSorting="true" Data="@dolci.Ingredienti" TItem="Data.Entity.Ingrediente">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="Data.Entity.Ingrediente" Property="Nome" Title="Nome" />
+                                    <RadzenDataGridColumn TItem="Data.Entity.Ingrediente" Property="Qta" Title="Quantita" />
+                                </Columns>
+                            </RadzenDataGrid>
+                        </RadzenTabsItem>
+                    </Tabs>
+                </RadzenTabs>
+            </Template>*@
+        <Columns>
+            <RadzenDataGridColumn Width="50px" TItem="Data.Entity.Dolce" Property="ID" TextAlign="TextAlign.Center" Filterable="false" Sortable="false">
+                <Template Context="Data">
+                    <i title="Modifica" style="color: navy; cursor: pointer" class="oi oi-pencil" @onclick="@(() => editDolce(@Data))"></i>
+                    &nbsp;&nbsp;
+                    <i class="oi oi-trash" title="Elimina" style="color:navy; cursor:pointer" @onclick="@(() => delDolce(@Data))"></i>
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Width="40px" TItem="Data.Entity.Dolce" Property="ID" Title="ID" />
+            <RadzenDataGridColumn Width="200px" TItem="Data.Entity.Dolce" Property="Nome" Title="Nome" />
+            <RadzenDataGridColumn Width="200px" TItem="Data.Entity.Dolce" Property="DataVendita" Title="Data vendita" FormatString="{0:d}" />
+            <RadzenDataGridColumn Width="50px" TItem="Data.Entity.Dolce" Property="Qta" Title="Quantita" />
+            <RadzenDataGridColumn  Width="50px" TItem="Data.Entity.Dolce" Property="Prezzo" Title="Prezzo" >
+                <Template Context="prezzo">
+                    @String.Format(new System.Globalization.CultureInfo("it-IT"), "{0:C}", prezzo.Prezzo)
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+    <div class="row form-group">
+        <div class="col-12">
+            &nbsp;
+        </div>
+    </div>
+    <div class="row form-group">
+        <div class="col-3"><Radzen.Blazor.RadzenButton ButtonType="ButtonType.Button" Icon="add_circle" ButtonStyle="ButtonStyle.Secondary" Text="AGGIUNGI" Click="@(() => addDolce())" /></div>
+        <div class="col-9 text-right">
+            Dolci presenti in archivio <b style="color:navy">@dolci.Count()</b> di cui in vetrina <b style="color:navy">@dolci.Where(x => x.IsVetrina == true && x.DataVendita >= DateTime.Now.Date.AddDays(-2) && x.DataVendita <= DateTime.Now.Date).Count()</b>
+        </div>
+    </div>
+}
+else
+{
+    <div class="d-flex align-items-center">
+        <strong>Loading...</strong>
+        <div class="spinner-border ml-auto" role="status" aria-hidden="true"></div>
+    </div>
+}
+
+@code {
+        string baseUrl;
+        IEnumerable<Data.Entity.Dolce> dolci;
+        RadzenDataGrid<Data.Entity.Dolce> myGridDolci;
+
+    protected override async Task OnInitializedAsync()
+    {
+        baseUrl = myAppSettings.GetBaseUrl();
+        dolci = await myCustomHttpClient.GetJsonAsync<Data.Entity.Dolce[]>(baseUrl + "/api/dolci/get");
+    }
+
+    void RowRender(RowRenderEventArgs<Data.Entity.Dolce> args)
+    {
+        args.Expandable = true;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        //if (firstRender)
+        //{
+        //    grid.ExpandRow(dolci.FirstOrDefault());
+        //    StateHasChanged();
+        //}
+
+        //base.OnAfterRender(firstRender);
+    }
+
+    async Task delDolce(Data.Entity.Dolce myDolce)
+    {
+        var confirmResult = await myDialogService.Confirm("Verranno cancellati il dolce e tutti gli ingredienti associati. Confermi ?", "Attenzione", new ConfirmOptions() { OkButtonText = "SI", CancelButtonText = "NO" });
+        if (confirmResult.HasValue && confirmResult.Value)
+        {
+            HttpResponseMessage message = await myCustomHttpClient.DeleteAsync(baseUrl + "/api/ingredienti/deletebydolce/" + myDolce.ID);
+            if (message.IsSuccessStatusCode)
+            {
+                message = await myCustomHttpClient.DeleteAsync(baseUrl + "/api/dolci/delete/" + myDolce.ID);
+                if (message.IsSuccessStatusCode)
+                    dolci = await myCustomHttpClient.GetJsonAsync<Data.Entity.Dolce[]>(baseUrl + "/api/dolci/get");
+            }
+        }
+    }
+
+    async Task addDolce()
+    {
+        await myDialogService.OpenAsync<DolciDetail>("Inserimento nuovo dolce",
+                new Dictionary<string, object>() { { "IDDolce", 0 } },
+                new DialogOptions() { Width = "900px", Height = "700px", Resizable = true, Draggable = true });
+
+        dolci = await myCustomHttpClient.GetJsonAsync<Data.Entity.Dolce[]>(baseUrl + "/api/dolci/get");
+    }
+
+    async Task editDolce(Data.Entity.Dolce myDolce)
+    {
+        await myDialogService.OpenAsync<DolciDetail>("Modifica dolce",
+                new Dictionary<string, object>() { { "IDDolce", myDolce.ID } },
+                new DialogOptions() { Width = "900px", Height = "700px", Resizable = true, Draggable = true });
+
+        dolci = await myCustomHttpClient.GetJsonAsync<Data.Entity.Dolce[]>(baseUrl + "/api/dolci/get");
+    }
+}
